@@ -10,25 +10,36 @@ import { buildLoginPath, HIDDEN_LOGIN_REDIRECT } from "../utils/auth-redirect";
 type ThemeMode = 'light' | 'dark' | 'system';
 
 
- const siteStart = new Date('2026-06-12');
- function getRunTime() {
-     const now = new Date();
-     let y = now.getFullYear() - siteStart.getFullYear();
-     let m = now.getMonth() - siteStart.getMonth();
-     let d = now.getDate() - siteStart.getDate();
-     if (d < 0) { m--; d += 30; }
-     if (m < 0) { y--; m += 12; }
-     let str = '';
-     if (y > 0) str += `${y}年`;
-     if (m > 0) str += `${m}个月`;
-     if (d > 0) str += `${d}天`;
-     return str || '1天';
- }
+const siteStart = new Date('2026-06-12'); // 你的建站日期
+
+function getRunTimeStr(start: Date) {
+  const now = new Date();
+  let ms = now.getTime() - start.getTime();
+  if (ms < 0) ms = 0;
+
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+
+  return `${d}天 ${h}时 ${m}分 ${sec}秒`;
+}
+
 
 function Footer() {
     const { t } = useTranslation()
     const [, setLocation] = useLocation()
     const [modeState, setModeState] = useState<ThemeMode>('system');
+const [runTime, setRunTime] = useState(() => getRunTimeStr(siteStart));
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setRunTime(getRunTimeStr(siteStart));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+ 
     const config = useContext(ClientConfigContext);
     const footerHtml = config.get<string>('footer');
     const footerHtmlRef = useRef<HTMLDivElement | null>(null);
@@ -120,8 +131,8 @@ function Footer() {
                         }
                     }}>
                         © {new Date().getFullYear()} Powered by <a className='hover:underline' href="https://915161.xyz" target="_blank">Rin / 汤</a>
-                  <Spliter />
-本站已运行：{getRunTime()}
+<Spliter />
+本站已运行：{runTime}
 
                     </span>
                     {config.getBoolean('rss') && <>
