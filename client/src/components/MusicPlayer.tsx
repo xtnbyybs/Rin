@@ -1,14 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { myPlaylist } from './playlist';
-
-interface SongDetails {
-  songName: string;
-  singer: string;
-  avatar: string;
-  musicUrl: string;
-}
+import { myPlaylist, SongItem } from './playlist'; // 🔒 1. 显式引入类型约束
 
 export const MusicPlayer = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -18,64 +11,36 @@ export const MusicPlayer = () => {
   const [volume, setVolume] = useState(1);
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // 动态获取的歌曲详情状态
-  const [songDetails, setSongDetails] = useState<SongDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // 位置状态（改用 top/left 体系，完美杜绝拖拽抖动）
-  const [position, setPosition] = useState({ x: 20, y: 400 }); 
+  // 坐标初始值改为静态数字，防止打包时服务器环境由于找不到 window 导致构建崩溃
+  const [position, setPosition] = useState({ x: 20, y: 300 }); 
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
 
-  // 1. 初始化位置（放在左下角）
+  // 🔒 2. 水合锁（Hydration Guard）：彻底杜绝 Cloudflare Pages 打包时 SSR/预渲染期间的报错
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     if (typeof window !== 'undefined') {
       setPosition({ x: 20, y: window.innerHeight - 150 });
     }
   }, []);
 
-  // 2. 核心：切换歌曲时，动态通过 API 请求最新的不失效直链
+  // 🔒 3. 精确指定对象类型为 SongItem
+  const currentSong: SongItem = myPlaylist[currentIndex];
+
   useEffect(() => {
-    const currentTrack = myPlaylist[currentIndex];
-    if (!currentTrack) return;
-
-    setIsLoading(true);
-    const apiUrl = `https://api.xtby.xyz/API/yy/kugou.php?type=mhash&hash=${currentTrack.hash}`;
-
-    fetch(apiUrl)
-      .then((res) => res.json())
-      .then((data) => {
-        const singer = data.authors?.[0]?.author_name || data.singer || '未知歌手';
-        const songName = data.songname || currentTrack.songName;
-        let rawAvatar = data.authors?.[0]?.avatar || data.mvicon || '';
-        const avatar = rawAvatar.replace('{size}', '400').replace('http://', 'https://');
-        let rawMusicUrl = data.downurl || data.mp3data?.downurl || data.mvdata?.le?.downurl || '';
-        const musicUrl = rawMusicUrl.replace('http://', 'https://');
-
-        setSongDetails({ songName, singer, avatar, musicUrl });
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        console.error('动态解析歌曲失败:', err);
-        setIsLoading(false);
-      });
-  }, [currentIndex]);
-
-  // 3. 当解析完新歌且处于播放状态时，触发播放
-  useEffect(() => {
-    if (isPlaying && songDetails?.musicUrl && audioRef.current) {
+    if (isPlaying && audioRef.current) {
       audioRef.current.play().catch(() => setIsPlaying(false));
     }
-  }, [songDetails, isPlaying]);
+  }, [currentIndex, isPlaying]);
 
-  // 控制音量
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
 
-  // 4. 5秒无操作自动收起
   useEffect(() => {
     if (isExpanded && isPlaying) {
       const timer = setTimeout(() => {
@@ -85,27 +50,17 @@ export const MusicPlayer = () => {
     }
   }, [isExpanded, isPlaying, currentIndex]);
 
-  // 5. 丝滑拖拽逻辑
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     if ((e.target as HTMLElement).closest('button, input')) return;
-
     setIsDragging(true);
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    
-    dragStart.current = {
-      x: clientX,
-      y: clientY,
-      posX: position.x,
-      posY: position.y
-    };
+    dragStart.current = { x: clientX, y: clientY, posX: position.x, posY: position.y };
   };
 
   useEffect(() => {
     const handleDragMove = (e: MouseEvent | TouchEvent) => {
       if (!isDragging) return;
-      
-      // 关键：阻止移动端的默认滚动行为，彻底解决背景跟着乱动、卡顿的现象
       if (e.cancelable) e.preventDefault();
 
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -117,16 +72,13 @@ export const MusicPlayer = () => {
       let newX = dragStart.current.posX + deltaX;
       let newY = dragStart.current.posY + deltaY;
 
-      // 边缘碰撞限制
       newX = Math.max(10, Math.min(window.innerWidth - (isExpanded ? 280 : 60), newX));
       newY = Math.max(10, Math.min(window.innerHeight - 70, newY));
 
       setPosition({ x: newX, y: newY });
     };
 
-    const handleDragEnd = () => {
-      setIsDragging(false);
-    };
+    const handleDragEnd = () => { setIsDragging(false); };
 
     if (isDragging) {
       window.addEventListener('mousemove', handleDragMove, { passive: false });
@@ -134,16 +86,14 @@ export const MusicPlayer = () => {
       window.addEventListener('touchmove', handleDragMove, { passive: false });
       window.addEventListener('touchend', handleDragEnd);
     }
-
     return () => {
       window.removeEventListener('mousemove', handleDragMove);
       window.removeEventListener('mouseup', handleDragEnd);
       window.removeEventListener('touchmove', handleDragMove);
       window.removeEventListener('touchend', handleDragEnd);
     };
-  }, [isDragging, isExpanded]);
+  }, [isDragging, isExpanded, position]);
 
-  // 播放暂停切换
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (audioRef.current) {
@@ -165,18 +115,11 @@ export const MusicPlayer = () => {
     }
   };
 
-  const playNext = () => {
-    setCurrentIndex((prev) => (prev === myPlaylist.length - 1 ? 0 : prev + 1));
-  };
+  // 🔒 4. 如果组件未在客户端完全挂载，返回 null（这是避免打包报错的关键点）
+  if (!mounted || !currentSong) return null;
 
-  const playPrev = () => {
-    setCurrentIndex((prev) => (prev === 0 ? myPlaylist.length - 1 : prev - 1));
-  };
-
-  // 即使没解析出来，也保留基础占位，防止拖拽组件直接消失
-  const displayTitle = songDetails?.songName || myPlaylist[currentIndex]?.songName || '加载中...';
-  const displaySinger = songDetails?.singer || '提示';
-  const displayAvatar = songDetails?.avatar || 'https://via.placeholder.com/150';
+  const safeAvatar = currentSong.avatar?.replace('http://', 'https://');
+  const safeMusicUrl = currentSong.musicUrl?.replace('http://', 'https://');
 
   return (
     <div
@@ -201,88 +144,54 @@ export const MusicPlayer = () => {
         cursor: isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         overflow: 'hidden',
-        touchAction: 'none', // 🔥 核心：彻底禁止移动端手势干扰网页，防止网页卡顿、跟着动
+        touchAction: 'none',
       }}
     >
-      {songDetails?.musicUrl && (
-        <audio ref={audioRef} src={songDetails.musicUrl} onEnded={playNext} />
-      )}
+      <audio ref={audioRef} src={safeMusicUrl} onEnded={() => setCurrentIndex((prev) => (prev === myPlaylist.length - 1 ? 0 : prev + 1))} />
 
-{/* ==================== 收起状态（黑胶光盘） ==================== */}
       {!isExpanded && (
-        <div 
-          onClick={() => setIsExpanded(true)}
-          style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', position: 'relative', cursor: 'pointer' }}
-        >
-          <img
-            src={displayAvatar}
-            alt="cd"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              animation: isPlaying && !isLoading ? 'spin 6s linear infinite' : 'none',
-              opacity: isLoading ? 0.5 : 1
-            }}
-          />
+        <div onClick={() => setIsExpanded(true)} style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', position: 'relative', cursor: 'pointer' }}>
+          <img src={safeAvatar} alt="cd" style={{ width: '100%', height: '100%', objectFit: 'cover', animation: isPlaying ? 'spin 6s linear infinite' : 'none' }} />
           <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '8px', height: '8px', backgroundColor: '#111', borderRadius: '50%', border: '2px solid #fff' }} />
         </div>
       )}
 
-      {/* ==================== 展开状态 ==================== */}
       {isExpanded && (
         <>
-          <div 
-            onClick={() => setIsExpanded(false)}
-            style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}
-          >
-            <img 
-              src={displayAvatar} 
-              alt="cover" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover', animation: isPlaying && !isLoading ? 'spin 6s linear infinite' : 'none' }} 
-            />
+          <div onClick={() => setIsExpanded(false)} style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
+            <img src={safeAvatar} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover', animation: isPlaying ? 'spin 6s linear infinite' : 'none' }} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2px' }}>
               <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#222', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>
-                {isLoading ? '解析中...' : displayTitle}
+                {currentSong.songName}
               </span>
               <span style={{ fontSize: '10px', color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '60px' }}>
-                {isLoading ? '⏱' : displaySinger}
+                {currentSong.singer}
               </span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              {/* 控制按钮 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button onClick={(e) => { e.stopPropagation(); playPrev(); }} style={btnStyle}>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex((prev) => (prev === 0 ? myPlaylist.length - 1 : prev - 1)); }} style={btnStyle}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
                 </button>
-                <button onClick={togglePlay} style={{ ...btnStyle, transform: 'scale(1.1)', opacity: isLoading ? 0.5 : 1 }} disabled={isLoading}>
+                <button onClick={togglePlay} style={{ ...btnStyle, transform: 'scale(1.1)' }}>
                   {isPlaying ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                   ) : (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                   )}
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); playNext(); }} style={btnStyle}>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentIndex((prev) => (prev === myPlaylist.length - 1 ? 0 : prev + 1)); }} style={btnStyle}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                 </button>
               </div>
 
-              {/* 音量滑块 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span style={{ fontSize: '10px' }}>🔊</span>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="1" 
-                  step="0.05" 
-                  value={volume} 
-                  onChange={(e) => setVolume(parseFloat(e.target.value))}
-                  style={{ width: '50px', height: '3px', accentColor: '#444', cursor: 'pointer' }}
-                />
+                <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} style={{ width: '50px', height: '3px', accentColor: '#444', cursor: 'pointer' }} />
               </div>
             </div>
           </div>
