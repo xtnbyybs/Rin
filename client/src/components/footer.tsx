@@ -102,7 +102,7 @@ function Footer() {
                             setDoubleClickTimes(doubleClickTimes + 1)
                         }
                     }}>
-                        © {new Date().getFullYear()} Powered by <a className='hover:underline' href="https://915161.xyz" target="_blank">汤</a>
+                        © {new Date().getFullYear()} Powered by <a className='hover:underline' href="https://915161.xyz" target="_blank">Rin / 汤</a>
                     </span>
                     {config.getBoolean('rss') && <>
                         <Spliter />
