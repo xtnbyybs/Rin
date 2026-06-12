@@ -8,6 +8,23 @@ import { useTranslation } from "react-i18next";
 import { buildLoginPath, HIDDEN_LOGIN_REDIRECT } from "../utils/auth-redirect";
 
 type ThemeMode = 'light' | 'dark' | 'system';
+
+
+ const siteStart = new Date('2026-06-12');
+ function getRunTime() {
+     const now = new Date();
+     let y = now.getFullYear() - siteStart.getFullYear();
+     let m = now.getMonth() - siteStart.getMonth();
+     let d = now.getDate() - siteStart.getDate();
+     if (d < 0) { m--; d += 30; }
+     if (m < 0) { y--; m += 12; }
+     let str = '';
+     if (y > 0) str += `${y}年`;
+     if (m > 0) str += `${m}个月`;
+     if (d > 0) str += `${d}天`;
+     return str || '1天';
+ }
+
 function Footer() {
     const { t } = useTranslation()
     const [, setLocation] = useLocation()
@@ -103,6 +120,9 @@ function Footer() {
                         }
                     }}>
                         © {new Date().getFullYear()} Powered by <a className='hover:underline' href="https://915161.xyz" target="_blank">Rin / 汤</a>
+                  <Spliter />
+本站已运行：{getRunTime()}
+
                     </span>
                     {config.getBoolean('rss') && <>
                         <Spliter />
