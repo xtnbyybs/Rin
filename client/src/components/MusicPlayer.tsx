@@ -100,7 +100,8 @@ export const MusicPlayer = () => {
       posY: position.y
     };
   };
-useEffect(() => {
+
+  useEffect(() => {
     const handleDragMove = (e: MouseEvent | TouchEvent) => {
       if (!isDragging) return;
       
@@ -207,7 +208,7 @@ useEffect(() => {
         <audio ref={audioRef} src={songDetails.musicUrl} onEnded={playNext} />
       )}
 
-      {/* ==================== 收起状态（黑胶光盘） ==================== */}
+{/* ==================== 收起状态（黑胶光盘） ==================== */}
       {!isExpanded && (
         <div 
           onClick={() => setIsExpanded(true)}
@@ -268,4 +269,38 @@ useEffect(() => {
                 <button onClick={(e) => { e.stopPropagation(); playNext(); }} style={btnStyle}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                 </button>
-              </div
+              </div>
+
+              {/* 音量滑块 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '10px' }}>🔊</span>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.05" 
+                  value={volume} 
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  style={{ width: '50px', height: '3px', accentColor: '#444', cursor: 'pointer' }}
+                />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+};
+
+const btnStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: 0,
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  color: '#444',
+};
