@@ -1,21 +1,21 @@
 // 文件路径：src/components/playlist.ts
-// 你可以在这里无限添加歌曲，注意每首歌用大括号 {} 包起来，用逗号分隔
+
 export const myPlaylist = [
-  {
-    id: 1,
-    songName: '晴天',
-    singer: '周杰伦',
-    // 换成你刚才API里抓到的或者以后自己找的图片链接
-    avatar: 'https://imge.kugou.com/mvhdpic/400/20200620/20200620174316264397.jpg', 
-    // 你的音乐直链，请尽量确保是 https 开头的
-    musicUrl: 'https://fsmvpc.tx.kugou.com/202606121835/a2be70bc445d66de9373cc35100217c9/v2/9c2ee96c98e7da251af731875d9e2cb4/KGTX/CLTX002/9c2ee96c98e7da251af731875d9e2cb4.mp4', 
-  },
-  {
-    id: 2,
-    songName: '测试歌曲二',
-    singer: '某某歌手',
-    avatar: 'https://via.placeholder.com/150', // 占位图
-    musicUrl: 'https://www.w3school.com.cn/i/horse.mp3', // 测试用音频
-  },
-  // { ...继续添加下一首... }
+  { songName: '晴天', hash: '92b86da2e11c3c84de3a944ed12d97f1' },
+  { songName: '先说爱的人为什么先离开', hash: '0a9e05cf65ddd8527e4c77ee26376d2c' },
+  { songName: '天使的翅膀', hash: 'bc347deb1debb31e847703d5118ae45a' },
+  { songName: '春泥', hash: '24e58a122dcbe890fbc87a275244bf22' },
+  { songName: '游京', hash: '4c332b1c5a5a270acb88f477b23fade8' },
+  { songName: '曾经是情侣', hash: '082af10472bfbe5227d02ff1de6a8d9f' },
+  { songName: '失控', hash: '44fe8c442eb1f254d15717f1dc03c9bf' },
+  { songName: '唯一', hash: 'ab05b8f658851282dcb2cbad548aeb9b' },
+  { songName: '桃花诺', hash: 'ff3ba0a7ad50d5bebb2ed7907f15608c' },
+  { songName: '暖一杯茶', hash: '26a9b8c6480c22bc4342f22cb897e760' },
+  { songName: '太阳', hash: 'd0817fe4bf404d0f9ec7727ce8eef453' },
+  { songName: '起风了', hash: '27b16858279b1d0d71c80913c4b844ce' },
+  { songName: '飞鸟和蝉', hash: 'eb5f5af3993f6537f2c70b959f2dcd6b' },
+  { songName: '执迷不悟', hash: 'c6a452a488fb047c6a481e3b3793cf69' },
+  { songName: '谁', hash: '445c54e59ab287fcf15d68faf92cd9b7' },
+  { songName: '慢慢', hash: 'd32d148d5ad0dd770dba7bc3a4f524dc' },
+  { songName: '绿色', hash: '39080698852e5cc51f0571ef438db175' }
 ];
