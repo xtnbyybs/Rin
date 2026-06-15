@@ -11,13 +11,14 @@ export const MusicPlayer = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(1);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showMenuList, setShowMenuList] = useState(false); // 控制点击换歌菜单显示
+  const [showMenuList, setShowMenuList] = useState(false); 
 
   // 进度条相关状态
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  
-  // 拖拽控制状态
+  const [isSeeking, setIsSeeking] = useState(false); // 🔒 进度条拖拽锁：防止拖动时弹回
+
+  // 拖拽整个播放器控制状态
   const [position, setPosition] = useState({ x: 20, y: 300 }); 
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
@@ -28,7 +29,6 @@ export const MusicPlayer = () => {
     setMounted(true);
     if (typeof window !== 'undefined') {
       setPosition({ x: 20, y: window.innerHeight - 180 });
-      // 🎲 随机机制：在歌单长度内随机取一个索引
       const randomIndex = Math.floor(Math.random() * myPlaylist.length);
       setCurrentIndex(randomIndex);
     }
@@ -47,7 +47,7 @@ export const MusicPlayer = () => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
-  // 3. 5秒无触碰自动收起（如果打开了切歌菜单，不自动收起）
+  // 3. 5秒无触碰自动收起
   useEffect(() => {
     if (isExpanded && isPlaying && !showMenuList) {
       const timer = setTimeout(() => setIsExpanded(false), 5000);
@@ -55,23 +55,42 @@ export const MusicPlayer = () => {
     }
   }, [isExpanded, isPlaying, currentIndex, showMenuList]);
 
-  // 更新进度条时间
+  // 更新进度条时间（🔒 只有没在拖拽进度条时，才允许随音乐更新时间）
   const handleTimeUpdate = () => {
-    if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
+    if (audioRef.current && !isSeeking) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
   };
 
   const handleLoadedMetadata = () => {
     if (audioRef.current) setDuration(audioRef.current.duration);
   };
 
-  // 4. 手动拉动调节歌曲进度（拖动进度条）
-  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = parseFloat(e.target.value);
-    setCurrentTime(newTime);
-    if (audioRef.current) audioRef.current.currentTime = newTime;
+  // ==================== 🔒 核心修复：进度条拖拽与松开逻辑 ====================
+  // 当手指/鼠标按住进度条时
+  const handleProgressStart = () => {
+    setIsSeeking(true);
   };
 
-  // 5. 丝滑拖拽判定
+  // 拖动过程中，只更新本地进度条UI，不影响音乐
+  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentTime(parseFloat(e.target.value));
+  };
+
+  // 当手指/鼠标松开时，正式把时间赋给音乐
+  const handleProgressEnd = (e: React.FormEvent<HTMLInputElement>) => {
+    const newTime = parseFloat((e.target as HTMLInputElement).value);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
+    // 延迟 100 毫秒解锁，给浏览器留出缓冲时间，完美解决“松手瞬间弹回”的浏览器原生 Bug
+    setTimeout(() => {
+      setIsSeeking(false);
+    }, 100);
+  };
+  // =========================================================================
+
+  // 4. 整个播放器盒子的丝滑拖拽判定
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     if ((e.target as HTMLElement).closest('button, input, ul, li')) return;
     setIsDragging(true);
@@ -124,16 +143,11 @@ export const MusicPlayer = () => {
     }
   };
 
-  const playNext = () => {
-    setCurrentIndex((prev) => (prev === myPlaylist.length - 1 ? 0 : prev + 1));
-  };
-
   if (!mounted || !currentSong) return null;
 
   const safeAvatar = currentSong.avatar.startsWith('http') ? currentSong.avatar.replace('http://', 'https://') : currentSong.avatar;
   const safeMusicUrl = currentSong.musicUrl.startsWith('http') ? currentSong.musicUrl.replace('http://', 'https://') : currentSong.musicUrl;
 
-  // 格式化时间辅助函数 (00:00)
   const formatTime = (time: number) => {
     const mins = Math.floor(time / 60);
     const secs = Math.floor(time % 60);
@@ -156,13 +170,12 @@ export const MusicPlayer = () => {
       }}
     >
       <audio 
-        ref={audioRef} src={safeMusicUrl} onEnded={playNext} 
+        ref={audioRef} src={safeMusicUrl} onEnded={() => setCurrentIndex((prev) => (prev === myPlaylist.length - 1 ? 0 : prev + 1))} 
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata} 
       />
 
-        {/* 主面板内容区 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isExpanded ? '12px' : '0px', width: '100%' }}>
-        {/* ==================== 状态一：收起（光盘） ==================== */}
+{/* 小球状态 */}
         {!isExpanded && (
           <div onClick={(e) => { e.stopPropagation(); if (!hasDraggedRef.current) setIsExpanded(true); }} style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', position: 'relative', cursor: 'pointer' }}>
             <img src={safeAvatar} alt="cd" style={{ width: '100%', height: '100%', objectFit: 'cover', animation: isPlaying ? 'spin 6s linear infinite' : 'none' }} />
@@ -170,20 +183,18 @@ export const MusicPlayer = () => {
           </div>
         )}
 
-        {/* ==================== 状态二：展开 ==================== */}
+        {/* 展开状态 */}
         {isExpanded && (
           <>
-            {/* 头像点击缩回小球 */}
             <div onClick={(e) => { e.stopPropagation(); setIsExpanded(false); setShowMenuList(false); }} style={{ width: '46px', height: '46px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
               <img src={safeAvatar} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover', animation: isPlaying ? 'spin 6s linear infinite' : 'none' }} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }}>
-              {/* 📜 点击该歌曲信息区域可以弹出/收起内置点歌菜单 */}
+              {/* 点击展开/收起歌曲选择列表 */}
               <div 
                 onClick={(e) => { e.stopPropagation(); setShowMenuList(!showMenuList); }}
                 style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer', marginBottom: '4px' }}
-                title="点击展开/收起歌曲选择列表"
               >
                 <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {currentSong.songName} <span style={{ fontSize: '10px', color: '#0070f3', marginLeft: '4px' }}>{showMenuList ? '▲' : '▼ 换歌'}</span>
@@ -191,12 +202,17 @@ export const MusicPlayer = () => {
                 <span style={{ fontSize: '11px', color: '#555' }}>{currentSong.singer}</span>
               </div>
 
-              {/* ⏱ 进度条控制调节 */}
+              {/* ⏱ 进度条（已绑定全新拖拽锁） */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                 <span style={{ fontSize: '9px', color: '#666', fontFamily: 'monospace' }}>{formatTime(currentTime)}</span>
                 <input 
-                  type="range" min="0" max={duration || 0} step="0.5"
-                  value={currentTime} onChange={handleProgressChange}
+                  type="range" min="0" max={duration || 0} step="0.1"
+                  value={currentTime} 
+                  onChange={handleProgressChange}
+                  onMouseDown={handleProgressStart}
+                  onMouseUp={handleProgressEnd}
+                  onTouchStart={handleProgressStart}
+                  onTouchEnd={handleProgressEnd}
                   style={{ flexGrow: 1, height: '3px', accentColor: '#222', cursor: 'pointer', margin: 0 }}
                 />
                 <span style={{ fontSize: '9px', color: '#666', fontFamily: 'monospace' }}>{formatTime(duration)}</span>
@@ -207,7 +223,7 @@ export const MusicPlayer = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <button onClick={(e) => { e.stopPropagation(); setCurrentIndex((prev) => (prev === 0 ? myPlaylist.length - 1 : prev - 1)); }} style={btnStyle}><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
                   <button onClick={togglePlay} style={{ ...btnStyle, transform: 'scale(1.2)' }}>{isPlaying ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg> : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>}</button>
-                  <button onClick={(e) => { e.stopPropagation(); playNext(); }} style={btnStyle}><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+                  <button onClick={(e) => { e.stopPropagation(); setCurrentIndex((prev) => (prev === myPlaylist.length - 1 ? 0 : prev + 1)); }} style={btnStyle}><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '10px' }}>🔊</span>
@@ -219,14 +235,9 @@ export const MusicPlayer = () => {
         )}
       </div>
 
-      {/* ==================== 📜 换歌列表弹出菜单组件 ==================== */}
+      {/* 换歌列表弹出菜单 */}
       {isExpanded && showMenuList && (
-        <div 
-          style={{
-            marginTop: '10px', borderTop: '1px solid #eaeaea', paddingTop: '8px',
-            maxHeight: '140px', overflowY: 'auto', width: '100%',
-          }}
-        >
+        <div style={{ marginTop: '10px', borderTop: '1px solid #eaeaea', paddingTop: '8px', maxHeight: '140px', overflowY: 'auto', width: '100%' }}>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {myPlaylist.map((song, index) => (
               <li
@@ -243,9 +254,7 @@ export const MusicPlayer = () => {
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = index === currentIndex ? 'rgba(0,112,243,0.08)' : '#f5f5f5'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index === currentIndex ? 'rgba(0,112,243,0.08)' : 'transparent'}
               >
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
-                  {song.songName}
-                </span>
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>{song.songName}</span>
                 <span style={{ opacity: 0.6 }}>{song.singer}</span>
               </li>
             ))}
@@ -259,3 +268,4 @@ export const MusicPlayer = () => {
 };
 
 const btnStyle: React.CSSProperties = { background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#333' };
+          
